@@ -26,6 +26,6 @@ Keep upstream's files as they are, so a resync stays a plain merge of upstream `
 - `scripts/publisher/` (the publisher and its tests, run with `npm run test:publisher`), `Dockerfile.publisher`, `.dockerignore`, `deploy/` and `docs/publisher-service.md`.
 - `package.json`: the `test:publisher` script.
 - `quartz/static/fonts/` (the default typography's font files, with their licences) and their `@font-face` rules in `quartz/styles/custom.scss`, Quartz's file for a site's own styles.
-- `.gitignore`: `.publisher-work`, the publisher's scratch folder, and `quartz.config.yaml`: a site's configuration belongs to its deployment, which mounts it into the container, not to this repository.
+- `.gitignore`: `.publisher-work`, the publisher's scratch folder, and `quartz.config.yaml`, which the publisher writes from the deployment's configuration layers, or the deployment mounts: a site's configuration belongs to its deployment, not to this repository. [P376]
 
-When resyncing with upstream, check whether `quartz.config.default.yaml` changed its plugin list: deployments copy it, so they need to follow.
+When resyncing with upstream, check whether `quartz.config.default.yaml` removed or renamed a plugin: a deployment's layer that names it then fails its publication. [P376]
