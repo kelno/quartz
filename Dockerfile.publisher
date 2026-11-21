@@ -14,11 +14,16 @@ RUN npm ci
 COPY . .
 
 # Generate the v5 plugin module inside the image and validate the privacy-critical exporter.
+# The service may run as any user, one the image doesn't know, so the folders it writes in at run
+# time are writable by all: the working folder, where it replaces content/ and keeps its scratch
+# folder .publisher-work, and Quartz's build caches.
 RUN npm run install-plugins \
     && npm run test:publisher \
     && npm run check \
     && cp -a content base-content \
-    && rm -rf public .quartz-cache .publisher-work
+    && rm -rf public .quartz-cache .publisher-work quartz/.quartz-cache \
+    && mkdir .quartz-cache .publisher-work quartz/.quartz-cache \
+    && chmod a+rwx . content .quartz-cache .publisher-work quartz/.quartz-cache
 
 ENV VAULT_DIR=/vault \
     OUTPUT_DIR=/output \

@@ -1,7 +1,8 @@
 # This repository's own workflow: build the publisher image (Dockerfile.publisher, whose build
-# runs the publisher's tests and Quartz's checks) on every push to main and publish it to GitHub's
-# container registry. Upstream's workflows only run in upstream's repository, so they never
-# compete with this one.
+# runs the publisher's tests and Quartz's checks) on every push to main, check that it publishes a
+# note when run as a user the image doesn't know, and only then publish it to GitHub's container
+# registry. Upstream's workflows only run in upstream's repository, so they never compete with this
+# one.
 name: publisher-image
 
 on:
@@ -51,7 +52,30 @@ jobs:
             type=raw,value=main
             type=sha
 
-      - name: Build and publish the image
+      - name: Build the image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Dockerfile.publisher
+          load: true
+          tags: quartz-publisher:test
+
+      # A server may run the image as any user, with no network and no capabilities: publish one
+      # note that way, once, and check the page is there.
+      - name: Publish a note as an unknown user
+        run: |
+          vault="$RUNNER_TEMP/vault"
+          output="$RUNNER_TEMP/output"
+          mkdir -p "$vault" "$output"
+          chmod a+rwx "$output"
+          printf -- '---\npublish: true\npermalink: blog/check\n---\nCheck.\n' > "$vault/check.md"
+          docker run --rm --network none --cap-drop all --security-opt no-new-privileges \
+            --user 54321:54321 --env RUN_ONCE=true \
+            --volume "$vault:/vault:ro" --volume "$output:/output:rw" \
+            quartz-publisher:test
+          test -f "$output/current/blog/check.html"
+
+      - name: Publish the image
         uses: docker/build-push-action@v7
         with:
           context: .

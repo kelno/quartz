@@ -103,7 +103,10 @@ sudoedit /etc/quartz-publisher.env
 ```
 
 The account running the service must be able to read `VAULT_HOST_DIR` and write
-`OUTPUT_HOST_DIR`. If SELinux is enforcing, assign an appropriate container-readable label to
+`OUTPUT_HOST_DIR`. The container doesn't need root: it runs as any user, one the image doesn't know
+included (`--user <uid>:<gid>`, for example the vault's owner, so the vault is read through its
+normal permissions), as long as that user can write `OUTPUT_HOST_DIR`. Every build of the image
+checks this by publishing a note as an unknown user, with no network and no capabilities. If SELinux is enforcing, assign an appropriate container-readable label to
 the vault and a container-writable label to the output directory instead of broadly disabling
 label enforcement.
 
