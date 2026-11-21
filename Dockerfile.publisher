@@ -1,0 +1,27 @@
+FROM node:22-slim AS publisher
+
+WORKDIR /usr/src/app
+
+COPY package.json package-lock.json .npmrc ./
+RUN npm ci
+
+COPY . .
+
+# Generate the v5 plugin module inside the image and validate the privacy-critical exporter.
+RUN npm run install-plugins \
+    && npm run test:publisher \
+    && npm run check \
+    && cp -a content base-content \
+    && rm -rf public .quartz-cache .publisher-work
+
+ENV VAULT_DIR=/vault \
+    OUTPUT_DIR=/output \
+    BASE_CONTENT_DIR=/usr/src/app/base-content \
+    QUARTZ_PROJECT_DIR=/usr/src/app \
+    POLL_INTERVAL_SECONDS=60 \
+    STABLE_SCANS=2
+
+VOLUME ["/vault", "/output"]
+
+CMD ["node", "scripts/publisher/service.mjs"]
+

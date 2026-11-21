@@ -1,0 +1,33 @@
+[Unit]
+Description=Build explicitly published Obsidian notes with Quartz
+Documentation=https://quartz.jzhao.xyz/
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/quartz-publisher.env
+ExecStartPre=/usr/bin/mkdir -p ${OUTPUT_HOST_DIR}
+ExecStartPre=-/usr/bin/podman rm --force quartz-publisher
+ExecStart=/usr/bin/podman run \
+  --name quartz-publisher \
+  --network none \
+  --cap-drop all \
+  --security-opt no-new-privileges \
+  --volume ${VAULT_HOST_DIR}:/vault:ro \
+  --volume ${OUTPUT_HOST_DIR}:/output:rw \
+  --env POLL_INTERVAL_SECONDS=${POLL_INTERVAL_SECONDS} \
+  --env STABLE_SCANS=${STABLE_SCANS} \
+  --env PUBLISH_IGNORE_DIRS=${PUBLISH_IGNORE_DIRS} \
+  --env PUBLISH_PERMALINK_PREFIXES=${PUBLISH_PERMALINK_PREFIXES} \
+  ${PUBLISHER_IMAGE}
+ExecStop=/usr/bin/podman stop --time 120 quartz-publisher
+ExecStopPost=-/usr/bin/podman rm --force quartz-publisher
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=135
+KillMode=none
+
+[Install]
+WantedBy=multi-user.target
+

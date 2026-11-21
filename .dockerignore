@@ -1,0 +1,12 @@
+.git
+.github
+.quartz
+.quartz-cache
+.publisher-work
+node_modules
+public
+docs
+prof
+*.log
+tsconfig.tsbuildinfo
+
