@@ -1,6 +1,8 @@
 This repository is AI-managed. These agent rules apply only to the owner's own agents, not to anyone else's.
 
-The repository is private but may become public: write everything in it, commit messages and history included, as if it already were. Nothing about the owner's own setup goes in (domains, server names, paths on their machines, accounts); that belongs to the deployment's infrastructure, which supplies it as settings.
+The repository is public: write everything in it, commit messages and history included, for anyone to read. Nothing about the owner's own setup goes in (domains, server names, paths on their machines, accounts); that belongs to the deployment's infrastructure, which supplies it as settings.
+
+Push only on the owner's explicit yes to that push, after showing them which commits it sends. [P372]
 
 It is Quartz (upstream: `https://github.com/jackyzha0/quartz`, branch `v5`) plus a publisher service that builds a public site from the notes of a private Obsidian vault. How the publisher works and how to run it: `docs/publisher-service.md`.
 
