@@ -31,6 +31,15 @@ function log(message) {
   console.log(`${new Date().toISOString()} ${message}`)
 }
 
+/**
+ * Returns the warnings of this scan that the previous scan didn't have. A problem that stays is
+ * logged once rather than at every scan; it is logged again if it goes away and comes back, or
+ * when the service restarts.
+ */
+export function newWarnings(previousWarnings, warnings) {
+  return warnings.filter((warning) => !previousWarnings.has(warning))
+}
+
 function parsePositiveInteger(value, fallback, name) {
   if (value === undefined || value === "") {
     return fallback
@@ -362,6 +371,8 @@ export async function runService(environment = process.env) {
   let stopping = false
   let previousCandidate = null
   let stableScanCount = 0
+  let previousWarnings = new Set()
+  let previousFailure = null
 
   const stop = (signal) => {
     log(`received ${signal}; stopping after the current operation`)
@@ -383,9 +394,10 @@ export async function runService(environment = process.env) {
         ignoredDirectoryNames: config.ignoredDirectoryNames,
         permalinkPrefixes: config.permalinkPrefixes,
       })
-      for (const warning of plan.warnings) {
+      for (const warning of newWarnings(previousWarnings, plan.warnings)) {
         console.warn(`${new Date().toISOString()} warning: ${warning}`)
       }
+      previousWarnings = new Set(plan.warnings)
 
       const releaseId = createReleaseId({ publicationDigest: plan.digest, buildDigest })
       if (releaseId === previousCandidate) {
@@ -401,10 +413,15 @@ export async function runService(environment = process.env) {
       } else if ((await currentReleaseId(config.outputRoot)) !== releaseId) {
         await publishRelease({ config, plan, buildDigest, releaseId })
       }
+      previousFailure = null
     } catch (error) {
       previousCandidate = null
       stableScanCount = 0
-      console.error(`${new Date().toISOString()} publication failed:`, error)
+      // The same failure repeats at every scan until its cause is fixed: log it once.
+      if (error.message !== previousFailure) {
+        console.error(`${new Date().toISOString()} publication failed:`, error)
+        previousFailure = error.message
+      }
       if (config.runOnce) {
         throw error
       }

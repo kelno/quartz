@@ -106,11 +106,15 @@ function parseFrontmatter(relativePath, source) {
     const data = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {}
     return { data, frontmatterYaml: match[1], body, warning: null }
   } catch (error) {
+    // Only the position: the parser's own message quotes the note's text, which must not end up
+    // in the server's logs. The frontmatter starts on the file's second line.
+    const position = error.linePos?.[0]
+    const where = position ? ` at line ${position.line + 1}, column ${position.col}` : ""
     return {
       data: {},
       frontmatterYaml: null,
       body,
-      warning: `${relativePath}: invalid YAML frontmatter; treated as unpublished (${error.message})`,
+      warning: `${relativePath}: invalid YAML frontmatter${where}; treated as unpublished`,
     }
   }
 }

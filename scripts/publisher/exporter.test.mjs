@@ -167,6 +167,16 @@ test("refuses a note marked publish without a usable permalink, with a warning",
   }
 })
 
+test("an invalid frontmatter warning gives the position, never the note's text", async () => {
+  const fixture = await createFixture()
+  await fixture.write("broken.md", "---\ntitle: fine\nsummary: secret words: here\n---\nBody.\n")
+
+  const plan = await createPublicationPlan({ vaultRoot: fixture.vaultRoot })
+  assert.deepEqual(plan.warnings, [
+    "broken.md: invalid YAML frontmatter at line 3, column 10; treated as unpublished",
+  ])
+})
+
 test("checkPermalink accepts any plain relative path when no prefixes are set", () => {
   assert.deepEqual(checkPermalink("notes/x.md"), { permalink: "notes/x" })
   assert.ok(checkPermalink("a//b").reason)

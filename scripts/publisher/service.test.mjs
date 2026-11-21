@@ -4,7 +4,7 @@ import os from "node:os"
 import path from "node:path"
 import test from "node:test"
 
-import { createReleaseId, pruneReleases, relativeReleaseTarget } from "./service.mjs"
+import { createReleaseId, newWarnings, pruneReleases, relativeReleaseTarget } from "./service.mjs"
 
 test("release identity changes when either content or the builder changes", () => {
   const original = createReleaseId({ publicationDigest: "content-a", buildDigest: "build-a" })
@@ -83,4 +83,12 @@ test("pruning an output without releases does nothing", async (t) => {
   const outputRoot = await mkdtemp(path.join(os.tmpdir(), "publisher-prune-"))
   t.after(() => rm(outputRoot, { recursive: true, force: true }))
   assert.deepEqual(await pruneReleases(outputRoot, 3), [])
+})
+
+test("a warning is logged once, and again only after it went away", () => {
+  const first = newWarnings(new Set(), ["a", "b"])
+  assert.deepEqual(first, ["a", "b"])
+  assert.deepEqual(newWarnings(new Set(["a", "b"]), ["a", "b"]), [])
+  assert.deepEqual(newWarnings(new Set(["a", "b"]), ["b", "c"]), ["c"])
+  assert.deepEqual(newWarnings(new Set(["b", "c"]), ["a", "b", "c"]), ["a"])
 })
