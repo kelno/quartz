@@ -130,6 +130,11 @@ Start it from `quartz.config.default.yaml` and set at least `baseUrl` to the pub
 RSS, sitemap and social metadata use the correct canonical URL. Keep the same plugin list as the
 defaults: plugins are installed when the image is built.
 
+To serve the fonts from the site itself, so visitors' browsers never contact Google Fonts, set both
+`configuration.theme.fontOrigin: local` and `configuration.fonts.fontOrigin: local`. The fonts of
+the default typography are in `quartz/static/fonts` (with their licences), declared in
+`quartz/styles/custom.scss`; another font needs its files there and its own `@font-face` rules.
+
 ## Manual one-shot validation
 
 The same image can perform one scan and exit:
