@@ -2,6 +2,12 @@ FROM node:22-slim AS publisher
 
 WORKDIR /usr/src/app
 
+# The service runs without network, so the og-image plugin can't fetch Google Fonts for the social
+# preview images; without a local font it skips them. DejaVu is the first font it falls back on.
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends fonts-dejavu-core \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY package.json package-lock.json .npmrc ./
 RUN npm ci
 

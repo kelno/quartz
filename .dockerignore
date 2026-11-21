@@ -10,3 +10,4 @@ prof
 *.log
 tsconfig.tsbuildinfo
 
+quartz.config.yaml
