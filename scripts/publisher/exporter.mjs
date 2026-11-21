@@ -7,6 +7,7 @@ import {
   mkdir,
   opendir,
   readFile,
+  rm,
   stat,
   utimes,
   writeFile,
@@ -133,6 +134,10 @@ function splitPrefixes(value) {
  * guessed path. With `permalinkPrefixes`, the permalink's first folder must be one of them: that
  * folder is the part of the site the note belongs to.
  */
+// The site's home page: a note with this permalink replaces Quartz's default home page, whatever
+// the permalink prefixes.
+export const HOME_PAGE_PERMALINK = "index"
+
 export function checkPermalink(value, permalinkPrefixes = []) {
   if (value === undefined || value === null || value === "") {
     return { reason: "no permalink" }
@@ -154,6 +159,9 @@ export function checkPermalink(value, permalinkPrefixes = []) {
     return { reason: `permalink "${value}" is not a plain relative path` }
   }
 
+  if (foldPath(permalink) === HOME_PAGE_PERMALINK) {
+    return { permalink: HOME_PAGE_PERMALINK }
+  }
   if (permalinkPrefixes.length > 0) {
     const prefixes = permalinkPrefixes.map(foldPath)
     if (segments.length < 2 || !prefixes.includes(foldPath(segments[0]))) {
@@ -592,7 +600,10 @@ export async function materializePublication({ plan, baseContentRoot, destinatio
       }
       throw error
     })
-    if (existing) {
+    if (existing && file.publishedPath === `${HOME_PAGE_PERMALINK}.md`) {
+      // The vault's home page replaces the default one.
+      await rm(target)
+    } else if (existing) {
       throw new Error(
         `${file.relativePath}: ${file.publishedPath} is already taken by the base content`,
       )

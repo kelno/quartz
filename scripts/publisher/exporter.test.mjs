@@ -177,6 +177,25 @@ test("an invalid frontmatter warning gives the position, never the note's text",
   ])
 })
 
+test("a note with the permalink index replaces the default home page", async () => {
+  const fixture = await createFixture()
+  await writeFile(path.join(fixture.baseContentRoot, "index.md"), "Welcome to Quartz\n")
+  await fixture.write("Somewhere/Home.md", "---\npublish: true\npermalink: Index\n---\nMy home.\n")
+
+  const plan = await fixture.publish({ permalinkPrefixes: ["blog"] })
+  assert.deepEqual(plan.warnings, [])
+  assert.match(await fixture.read("index.md"), /My home\./)
+  assert.doesNotMatch(await fixture.read("index.md"), /Welcome to Quartz/)
+})
+
+test("a note can't take any other path the base content holds", async () => {
+  const fixture = await createFixture()
+  await writeFile(path.join(fixture.baseContentRoot, "taken.md"), "Base\n")
+  await fixture.write("note.md", "---\npublish: true\npermalink: taken\n---\n")
+
+  await assert.rejects(fixture.publish(), /already taken by the base content/)
+})
+
 test("checkPermalink accepts any plain relative path when no prefixes are set", () => {
   assert.deepEqual(checkPermalink("notes/x.md"), { permalink: "notes/x" })
   assert.ok(checkPermalink("a//b").reason)

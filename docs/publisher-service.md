@@ -14,6 +14,10 @@ nothing of how the vault is organised. The note stays where it is; only the copy
 is placed at `<permalink>.md`. Every attachment a published note uses is placed in one
 `attachments/` folder, by file name.
 
+The note with `permalink: index` is the site's home page: it replaces Quartz's default one
+("Welcome to Quartz"), and it is accepted whatever `PUBLISH_PERMALINK_PREFIXES` says. Without such a
+note, the default home page stays.
+
 In that copy, every link or embed that points to a published note or an attachment is rewritten
 to its site path (`[[Design notes]]` becomes `[[articles/design|Design notes]]`, keeping the text
 the reader sees). Links to notes that are not published are left as written: on the site they
