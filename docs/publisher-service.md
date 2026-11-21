@@ -26,6 +26,11 @@ A note marked `publish: true` is refused, left unpublished with a warning in the
   start with one of those folders followed by a page name. Each prefix is a part of the site,
   with its own listing page.
 
+A warning is logged once, when it first appears, not at every scan; it is logged again if it goes
+away and comes back, and when the service restarts. A failed publication is likewise logged once
+until it fails differently. Warnings name the note and never quote its text: invalid frontmatter
+is reported by its line and column only.
+
 ## Publication boundary
 
 The exporter recognizes local files referenced through:
