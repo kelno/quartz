@@ -65,17 +65,22 @@ The `current` link is replaced atomically only after Quartz finishes successfull
 release contains `index.html`. A failed export or build leaves the previous link untouched.
 Releases are retained for rollback; automatic destructive pruning is intentionally disabled.
 
-## Build the publisher image
+## Get the publisher image
 
-From the Quartz repository:
+Every push to `main` builds the image with GitHub Actions (`.github/workflows/publisher-image.yaml`)
+and publishes it to GitHub's container registry as `ghcr.io/<owner>/quartz-publisher`, tagged `main`
+(the latest build) and `sha-<short commit>` (each build, for a rollback). A server that follows the
+`main` tag, for example with Podman's auto-update, runs every push to `main`.
+
+To build it yourself instead, from the Quartz repository:
 
 ```bash
 sudo podman build --file Dockerfile.publisher --tag localhost/quartz-publisher:v5 .
 ```
 
-The provided unit is a system service and therefore uses root's Podman image store. The image
-build runs the publisher tests, the Quartz type check, and the formatting check. If you convert
-the unit to a per-user service, build the image with that same user instead.
+Either way, the image build runs the publisher tests, the Quartz type check, and the formatting
+check. The provided unit is a system service and therefore uses root's Podman image store; if you
+convert it to a per-user service, pull or build the image with that same user instead.
 
 ## Configure systemd
 

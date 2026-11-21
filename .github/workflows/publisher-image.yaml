@@ -1,0 +1,61 @@
+# This repository's own workflow: build the publisher image (Dockerfile.publisher, whose build
+# runs the publisher's tests and Quartz's checks) on every push to main and publish it to GitHub's
+# container registry. Upstream's workflows only run in upstream's repository, so they never
+# compete with this one.
+name: publisher-image
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: publisher-image
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner }}/quartz-publisher
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Log in to the container registry
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for the image
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          # main is the tag a server follows to run the latest build; sha-<short> keeps every build
+          # addressable for a rollback.
+          tags: |
+            type=raw,value=main
+            type=sha
+
+      - name: Build and publish the image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Dockerfile.publisher
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
