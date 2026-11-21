@@ -63,7 +63,12 @@ The host output directory has this shape:
 
 The `current` link is replaced atomically only after Quartz finishes successfully and the new
 release contains `index.html`. A failed export or build leaves the previous link untouched.
-Releases are retained for rollback; automatic destructive pruning is intentionally disabled.
+
+After each switch, and when the service starts, the publisher deletes old releases: it keeps the
+last `KEEP_RELEASES` releases to go live (3 by default), for a rollback, and deletes the others,
+so a note that is no longer published doesn't stay on disk for long. The release `current` points
+to is always kept and counts among them, even after a rollback made by hand. Unfinished builds left
+by an interrupted run are deleted too. Nothing else in `releases/` is touched.
 
 ## Get the publisher image
 

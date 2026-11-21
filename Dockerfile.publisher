@@ -25,7 +25,8 @@ ENV VAULT_DIR=/vault \
     BASE_CONTENT_DIR=/usr/src/app/base-content \
     QUARTZ_PROJECT_DIR=/usr/src/app \
     POLL_INTERVAL_SECONDS=60 \
-    STABLE_SCANS=2
+    STABLE_SCANS=2 \
+    KEEP_RELEASES=3
 
 VOLUME ["/vault", "/output"]
 

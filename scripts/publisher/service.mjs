@@ -11,6 +11,7 @@ import {
   rm,
   stat,
   symlink,
+  utimes,
   writeFile,
 } from "node:fs/promises"
 import path from "node:path"
@@ -24,6 +25,7 @@ import {
 } from "./exporter.mjs"
 
 const RELEASE_ID_PATTERN = /^[a-f\d]{64}$/
+const TEMPORARY_RELEASE_PATTERN = /^\.([a-f\d]{64})\.(\d+)\.tmp$/
 
 function log(message) {
   console.log(`${new Date().toISOString()} ${message}`)
@@ -152,6 +154,10 @@ async function runQuartzBuild({ projectRoot, outputDirectory }) {
 async function activateRelease(outputRoot, releaseId) {
   const currentPath = path.join(outputRoot, "current")
   const temporaryLink = path.join(outputRoot, `.current-${process.pid}`)
+  // A release's modification time records when it last went live, which orders releases for
+  // pruning: an older release activated again counts as the newest.
+  const now = new Date()
+  await utimes(path.join(outputRoot, relativeReleaseTarget(releaseId)), now, now)
   await rm(temporaryLink, { force: true })
   await symlink(relativeReleaseTarget(releaseId), temporaryLink, "dir")
   await rename(temporaryLink, currentPath)
@@ -171,6 +177,62 @@ async function currentReleaseId(outputRoot) {
       return null
     }
     throw error
+  }
+}
+
+/**
+ * Deletes old releases, keeping the `keepReleases` most recently activated ones. The release
+ * `current` points to is always kept and counts among them, whatever its age, so a manual
+ * rollback is never undone. Also removes the unfinished builds an interrupted run left behind.
+ * Only entries named like releases are touched. Returns the names of the deleted entries.
+ */
+export async function pruneReleases(outputRoot, keepReleases) {
+  const releasesRoot = path.join(outputRoot, "releases")
+  const liveReleaseId = await currentReleaseId(outputRoot)
+  const releases = []
+  const deleted = []
+
+  let directory
+  try {
+    directory = await opendir(releasesRoot)
+  } catch (error) {
+    if (error.code === "ENOENT") {
+      return deleted
+    }
+    throw error
+  }
+  for await (const entry of directory) {
+    if (!entry.isDirectory()) {
+      continue
+    }
+    const temporary = entry.name.match(TEMPORARY_RELEASE_PATTERN)
+    if (temporary && Number(temporary[2]) !== process.pid) {
+      await rm(path.join(releasesRoot, entry.name), { recursive: true, force: true })
+      deleted.push(entry.name)
+    } else if (RELEASE_ID_PATTERN.test(entry.name) && entry.name !== liveReleaseId) {
+      const { mtimeMs } = await lstat(path.join(releasesRoot, entry.name))
+      releases.push({ name: entry.name, mtimeMs })
+    }
+  }
+
+  releases.sort((left, right) => right.mtimeMs - left.mtimeMs)
+  const otherReleasesKept = liveReleaseId ? keepReleases - 1 : keepReleases
+  for (const release of releases.slice(Math.max(otherReleasesKept, 0))) {
+    await rm(path.join(releasesRoot, release.name), { recursive: true, force: true })
+    deleted.push(release.name)
+  }
+  return deleted
+}
+
+async function pruneReleasesSafely(config) {
+  try {
+    const deleted = await pruneReleases(config.outputRoot, config.keepReleases)
+    if (deleted.length > 0) {
+      log(`deleted ${deleted.length} old release(s); keeping the last ${config.keepReleases}`)
+    }
+  } catch (error) {
+    // The live site is already in place; a failed cleanup is retried after the next release.
+    console.warn(`${new Date().toISOString()} warning: could not delete old releases:`, error)
   }
 }
 
@@ -198,6 +260,7 @@ async function publishRelease({ config, plan, buildDigest, releaseId }) {
     await access(finalRelease)
     log(`release ${releaseId} already exists; activating it`)
     await activateRelease(config.outputRoot, releaseId)
+    await pruneReleasesSafely(config)
     return
   } catch (error) {
     if (error.code !== "ENOENT") {
@@ -233,6 +296,7 @@ async function publishRelease({ config, plan, buildDigest, releaseId }) {
     await rm(stagedContent, { recursive: true, force: true })
     await rm(temporaryRelease, { recursive: true, force: true })
   }
+  await pruneReleasesSafely(config)
 }
 
 function readConfiguration(environment = process.env) {
@@ -247,6 +311,7 @@ function readConfiguration(environment = process.env) {
     pollIntervalMs:
       parsePositiveInteger(environment.POLL_INTERVAL_SECONDS, 60, "POLL_INTERVAL_SECONDS") * 1000,
     stableScans: parsePositiveInteger(environment.STABLE_SCANS, 2, "STABLE_SCANS"),
+    keepReleases: parsePositiveInteger(environment.KEEP_RELEASES, 3, "KEEP_RELEASES"),
     ignoredDirectoryNames: splitCommaSeparated(
       environment.PUBLISH_IGNORE_DIRS,
       DEFAULT_IGNORED_DIRECTORIES,
@@ -292,6 +357,7 @@ export async function runService(environment = process.env) {
   await mkdir(config.outputRoot, { recursive: true })
 
   const buildDigest = await createBuildDigest(config)
+  await pruneReleasesSafely(config)
   const delay = createInterruptibleDelay()
   let stopping = false
   let previousCandidate = null
