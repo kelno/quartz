@@ -123,8 +123,12 @@ server {
 }
 ```
 
-Set the real public hostname in `quartz.config.yaml` before deploying so RSS, sitemap, and social
-metadata use the correct canonical URL.
+The site's Quartz configuration is not part of this repository: the image is built with Quartz's
+defaults (`quartz.config.default.yaml`), and each deployment supplies its own `quartz.config.yaml`,
+mounted read-only over `/usr/src/app/quartz.config.yaml` (`QUARTZ_CONFIG_HOST_FILE` in the unit).
+Start it from `quartz.config.default.yaml` and set at least `baseUrl` to the public hostname, so
+RSS, sitemap and social metadata use the correct canonical URL. Keep the same plugin list as the
+defaults: plugins are installed when the image is built.
 
 ## Manual one-shot validation
 

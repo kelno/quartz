@@ -16,6 +16,7 @@ ExecStart=/usr/bin/podman run \
   --security-opt no-new-privileges \
   --volume ${VAULT_HOST_DIR}:/vault:ro \
   --volume ${OUTPUT_HOST_DIR}:/output:rw \
+  --volume ${QUARTZ_CONFIG_HOST_FILE}:/usr/src/app/quartz.config.yaml:ro \
   --env POLL_INTERVAL_SECONDS=${POLL_INTERVAL_SECONDS} \
   --env STABLE_SCANS=${STABLE_SCANS} \
   --env PUBLISH_IGNORE_DIRS=${PUBLISH_IGNORE_DIRS} \

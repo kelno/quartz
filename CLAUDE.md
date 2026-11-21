@@ -1,5 +1,7 @@
 This repository is AI-managed. These agent rules apply only to the owner's own agents, not to anyone else's.
 
+The repository is private but may become public: write everything in it, commit messages and history included, as if it already were. Nothing about the owner's own setup goes in (domains, server names, paths on their machines, accounts); that belongs to the deployment's infrastructure, which supplies it as settings.
+
 It is Quartz (upstream: `https://github.com/jackyzha0/quartz`, branch `v5`) plus a publisher service that builds a public site from the notes of a private Obsidian vault. How the publisher works and how to run it: `docs/publisher-service.md`.
 
 ## Tenets
@@ -19,8 +21,7 @@ What the publisher must do, set by the owner. They outweigh any technical choice
 Keep upstream's files as they are, so a resync stays a plain merge of upstream `v5`. What is this repo's own:
 
 - `scripts/publisher/` (the publisher and its tests, run with `npm run test:publisher`), `Dockerfile.publisher`, `.dockerignore`, `deploy/` and `docs/publisher-service.md`.
-- `quartz.config.yaml`: upstream's `quartz.config.default.yaml` with the `explicit-publish` filter switched on.
 - `package.json`: the `test:publisher` script.
-- `.gitignore`: `.publisher-work`, the publisher's scratch folder.
+- `.gitignore`: `.publisher-work`, the publisher's scratch folder, and `quartz.config.yaml`: a site's configuration belongs to its deployment, which mounts it into the container, not to this repository.
 
-When resyncing with upstream, compare `quartz.config.yaml` with the new `quartz.config.default.yaml` and carry over what upstream changed.
+When resyncing with upstream, check whether `quartz.config.default.yaml` changed its plugin list: deployments copy it, so they need to follow.
