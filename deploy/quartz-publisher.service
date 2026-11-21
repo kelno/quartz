@@ -16,12 +16,13 @@ ExecStart=/usr/bin/podman run \
   --security-opt no-new-privileges \
   --volume ${VAULT_HOST_DIR}:/vault:ro \
   --volume ${OUTPUT_HOST_DIR}:/output:rw \
-  --volume ${QUARTZ_CONFIG_HOST_FILE}:/usr/src/app/quartz.config.yaml:ro \
+  --volume ${QUARTZ_CONFIG_HOST_DIR}:/config:ro \
   --env POLL_INTERVAL_SECONDS=${POLL_INTERVAL_SECONDS} \
   --env STABLE_SCANS=${STABLE_SCANS} \
   --env KEEP_RELEASES=${KEEP_RELEASES} \
   --env PUBLISH_IGNORE_DIRS=${PUBLISH_IGNORE_DIRS} \
   --env PUBLISH_PERMALINK_PREFIXES=${PUBLISH_PERMALINK_PREFIXES} \
+  --env QUARTZ_CONFIG_LAYERS=${QUARTZ_CONFIG_LAYERS} \
   ${PUBLISHER_IMAGE}
 ExecStop=/usr/bin/podman stop --time 120 quartz-publisher
 ExecStopPost=-/usr/bin/podman rm --force quartz-publisher

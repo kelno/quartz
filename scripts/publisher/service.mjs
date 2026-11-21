@@ -23,6 +23,7 @@ import {
   materializePublication,
   readPermalinkPrefixes,
 } from "./exporter.mjs"
+import { assembleSiteConfig, SITE_CONFIG_FILE } from "./site-config.mjs"
 
 const RELEASE_ID_PATTERN = /^[a-f\d]{64}$/
 const TEMPORARY_RELEASE_PATTERN = /^\.([a-f\d]{64})\.(\d+)\.tmp$/
@@ -117,12 +118,15 @@ async function hashTree(hash, root, label) {
   }
 }
 
-export async function createBuildDigest({ projectRoot, baseContentRoot }) {
+export async function createBuildDigest({ projectRoot, baseContentRoot, configLayers = [] }) {
   const hash = createHash("sha256")
   const inputs = [
     [path.join(projectRoot, "package.json"), "package.json"],
     [path.join(projectRoot, "package-lock.json"), "package-lock.json"],
-    [path.join(projectRoot, "quartz.config.yaml"), "quartz.config.yaml"],
+    // With configuration layers, the publisher writes this file itself and hashes what it writes.
+    ...(configLayers.length > 0
+      ? [[path.join(projectRoot, "quartz.config.default.yaml"), "quartz.config.default.yaml"]]
+      : [[path.join(projectRoot, SITE_CONFIG_FILE), SITE_CONFIG_FILE]]),
     [path.join(projectRoot, "quartz.ts"), "quartz.ts"],
     [path.join(projectRoot, "quartz"), "quartz"],
     [path.join(projectRoot, ".quartz", "plugins", "index.ts"), ".quartz/plugins/index.ts"],
@@ -134,6 +138,28 @@ export async function createBuildDigest({ projectRoot, baseContentRoot }) {
     await hashTree(hash, inputPath, label)
   }
   return hash.digest("hex")
+}
+
+function withSiteConfig(buildDigest, siteConfig) {
+  if (siteConfig === null) {
+    return buildDigest
+  }
+  return createHash("sha256").update(buildDigest).update("\0").update(siteConfig).digest("hex")
+}
+
+async function writeSiteConfig(projectRoot, siteConfig) {
+  const target = path.join(projectRoot, SITE_CONFIG_FILE)
+  const temporary = path.join(projectRoot, `.${SITE_CONFIG_FILE}.${process.pid}.tmp`)
+  await writeFile(temporary, siteConfig)
+  try {
+    await rename(temporary, target)
+  } catch (error) {
+    await rm(temporary, { force: true })
+    throw new Error(
+      `cannot write ${target} (${error.code}): with QUARTZ_CONFIG_LAYERS, the publisher writes ` +
+        `this file itself, so it must not be mounted`,
+    )
+  }
 }
 
 async function runQuartzBuild({ projectRoot, outputDirectory }) {
@@ -254,7 +280,7 @@ async function writeState(outputRoot, state) {
   await rename(temporaryPath, statePath)
 }
 
-async function publishRelease({ config, plan, buildDigest, releaseId }) {
+async function publishRelease({ config, plan, buildDigest, siteConfig, releaseId }) {
   const releasesRoot = path.join(config.outputRoot, "releases")
   const finalRelease = path.join(releasesRoot, releaseId)
   const temporaryRelease = path.join(releasesRoot, `.${releaseId}.${process.pid}.tmp`)
@@ -289,6 +315,9 @@ async function publishRelease({ config, plan, buildDigest, releaseId }) {
 
     await rm(projectContent, { recursive: true, force: true })
     await rename(stagedContent, projectContent)
+    if (siteConfig !== null) {
+      await writeSiteConfig(config.projectRoot, siteConfig)
+    }
     await runQuartzBuild({ projectRoot: config.projectRoot, outputDirectory: temporaryRelease })
     await access(path.join(temporaryRelease, "index.html"))
     await rename(temporaryRelease, finalRelease)
@@ -326,6 +355,9 @@ function readConfiguration(environment = process.env) {
       DEFAULT_IGNORED_DIRECTORIES,
     ),
     permalinkPrefixes: readPermalinkPrefixes(environment.PUBLISH_PERMALINK_PREFIXES),
+    configLayers: splitCommaSeparated(environment.QUARTZ_CONFIG_LAYERS, []).map((layer) =>
+      path.resolve(layer),
+    ),
     runOnce: environment.RUN_ONCE === "true",
   }
 }
@@ -386,6 +418,9 @@ export async function runService(environment = process.env) {
     `polling ${config.vaultRoot} every ${config.pollIntervalMs / 1000}s; ` +
       `requiring ${config.stableScans} stable scan(s)`,
   )
+  if (config.configLayers.length > 0) {
+    log(`site configuration: Quartz's defaults, then ${config.configLayers.join(", ")}`)
+  }
 
   while (!stopping) {
     try {
@@ -399,7 +434,19 @@ export async function runService(environment = process.env) {
       }
       previousWarnings = new Set(plan.warnings)
 
-      const releaseId = createReleaseId({ publicationDigest: plan.digest, buildDigest })
+      // Re-read at every scan, so a change to a layer rebuilds the site without a restart.
+      const siteConfig =
+        config.configLayers.length > 0
+          ? await assembleSiteConfig({
+              projectRoot: config.projectRoot,
+              layerPaths: config.configLayers,
+            })
+          : null
+      const scanBuildDigest = withSiteConfig(buildDigest, siteConfig)
+      const releaseId = createReleaseId({
+        publicationDigest: plan.digest,
+        buildDigest: scanBuildDigest,
+      })
       if (releaseId === previousCandidate) {
         stableScanCount += 1
       } else {
@@ -411,7 +458,13 @@ export async function runService(environment = process.env) {
       if (stableScanCount < requiredScans) {
         log(`candidate ${releaseId} is stable for ${stableScanCount}/${requiredScans} scan(s)`)
       } else if ((await currentReleaseId(config.outputRoot)) !== releaseId) {
-        await publishRelease({ config, plan, buildDigest, releaseId })
+        await publishRelease({
+          config,
+          plan,
+          buildDigest: scanBuildDigest,
+          siteConfig,
+          releaseId,
+        })
       }
       previousFailure = null
     } catch (error) {

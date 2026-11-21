@@ -145,12 +145,40 @@ server {
 }
 ```
 
-The site's Quartz configuration is not part of this repository: the image is built with Quartz's
-defaults (`quartz.config.default.yaml`), and each deployment supplies its own `quartz.config.yaml`,
-mounted read-only over `/usr/src/app/quartz.config.yaml` (`QUARTZ_CONFIG_HOST_FILE` in the unit).
-Start it from `quartz.config.default.yaml` and set at least `baseUrl` to the public hostname, so
-RSS, sitemap and social metadata use the correct canonical URL. Keep the same plugin list as the
-defaults: plugins are installed when the image is built.
+## Configure the site
+
+The site's Quartz configuration is not part of this repository. Quartz reads one file,
+`quartz.config.yaml`; the publisher writes it before each build from layers: Quartz's defaults
+(`quartz.config.default.yaml`, in the image), then each file listed in `QUARTZ_CONFIG_LAYERS`, in
+order, each one overriding the previous. A deployment can, for example, write a few settings of its
+own in one layer and leave the next one for the site's owner to edit on the server. A layer only
+holds what it changes:
+
+```yaml
+configuration:
+  pageTitle: My notes
+  baseUrl: notes.example.com
+  analytics: null
+plugins:
+  - source: "@quartz-community/explorer"
+    enabled: false
+```
+
+- Maps merge key by key. Any other value, a list included, replaces the one before it whole.
+- `plugins` merges by `source`: a layer changes only the fields it names in that plugin's entry. It
+  can't add a plugin the defaults don't list, since plugins are installed when the image is built;
+  such a layer fails the build.
+- A layer file that doesn't exist counts as empty, and JSON works too, being YAML.
+- The layers are read at every scan: a change to one rebuilds the site, after the same stable scans
+  as a note, without restarting the service. An invalid layer fails the build, reported by its line
+  and column, and the site keeps its last release.
+- Mount the folder holding the layers rather than each file, so a layer can be created or replaced
+  while the service runs. With `QUARTZ_CONFIG_LAYERS` set, don't mount a `quartz.config.yaml` into
+  the container: the publisher writes that file itself. Without it, Quartz reads
+  `/usr/src/app/quartz.config.yaml` if one is mounted, or else its defaults.
+
+Set at least `baseUrl` to the public hostname, so RSS, sitemap and social metadata use the correct
+canonical URL.
 
 To serve the fonts from the site itself, so visitors' browsers never contact Google Fonts, set both
 `configuration.theme.fontOrigin: local` and `configuration.fonts.fontOrigin: local`. The fonts of

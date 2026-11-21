@@ -61,19 +61,24 @@ jobs:
           tags: quartz-publisher:test
 
       # A server may run the image as any user, with no network and no capabilities: publish one
-      # note that way, once, and check the page is there.
+      # note that way, once, with a configuration layer, and check the page and the layer's title.
       - name: Publish a note as an unknown user
         run: |
           vault="$RUNNER_TEMP/vault"
           output="$RUNNER_TEMP/output"
-          mkdir -p "$vault" "$output"
+          layers="$RUNNER_TEMP/config"
+          mkdir -p "$vault" "$output" "$layers"
           chmod a+rwx "$output"
           printf -- '---\npublish: true\npermalink: blog/check\n---\nCheck.\n' > "$vault/check.md"
+          printf 'configuration:\n  pageTitle: Layered title\n' > "$layers/site.yaml"
           docker run --rm --network none --cap-drop all --security-opt no-new-privileges \
             --user 54321:54321 --env RUN_ONCE=true \
+            --env QUARTZ_CONFIG_LAYERS=/config/site.yaml,/config/absent.yaml \
             --volume "$vault:/vault:ro" --volume "$output:/output:rw" \
+            --volume "$layers:/config:ro" \
             quartz-publisher:test
           test -f "$output/current/blog/check.html"
+          grep -q "Layered title" "$output/current/blog/check.html"
 
       - name: Publish the image
         uses: docker/build-push-action@v7

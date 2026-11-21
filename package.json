@@ -17,7 +17,7 @@
     "check": "tsc --noEmit && npx prettier . --check",
     "format": "npx prettier . --write",
     "test": "tsx --test",
-    "test:publisher": "node --test scripts/publisher/exporter.test.mjs scripts/publisher/service.test.mjs",
+    "test:publisher": "node --test scripts/publisher/exporter.test.mjs scripts/publisher/service.test.mjs scripts/publisher/site-config.test.mjs",
     "profile": "0x -D prof ./quartz/bootstrap-cli.mjs build --concurrency=1",
     "install-plugins": "npx tsx ./quartz/plugins/loader/install-plugins.ts",
     "prebuild": "npm run install-plugins",
